@@ -1,0 +1,1 @@
+../bin/x86_64/macos/kind2-mcil --z3_bin /usr/local/bin/z3 $1
