@@ -1,19 +1,22 @@
 (set-logic QF_LIA)
 
-(define-system Historically 
-    :input ((b Bool)) 
-    :output ((hb Bool))
-    :init (= hb b) 
-    :trans (= hb' (and b' hb))
-)
-
+; Before operator from past LTL
 (define-system Before 
-    :input ((b Bool)) 
-    :output ((bb Bool))
-    :init (= bb false)
-    :trans (= bb' b)
+  :input ((b Bool)) 
+  :output ((before_b Bool))
+  :init (= before_b false)
+  :trans (= before_b' b)
 )
 
+; Historically operator from past LTL
+(define-system Historically 
+  :input ((b Bool)) 
+  :output ((hist_b Bool))
+  :init (= hist_b b) 
+  :trans (= hist_b' (and b' hist_b))
+)
+
+; (Count b) counts number of times b has been true so far
 (define-system Count 
     :input ((b Bool)) 
     :output ((c Int))
@@ -25,18 +28,17 @@
  :input ( (r1 Bool) (r2 Bool) )
  :output ( (g1 Bool) (g2 Bool) )
  :local ( (s Bool) )
- :init (and (not g1) (not g2) )  ; nothing is granted initially
- :trans (and
-  (=> (and (not r1') (not r2'))
-      (and (not g1') (not g2')))
-  (=> (and r1' (not r2'))
-      (and g1' (not g2')))
-  (=> (and (not r1') r2')
-      (and (not g1') g2'))
-  (=> (and r1' r2')
+ :inv (and
+  (=> (and (not r1) (not r2))
+      (and (not g1) (not g2)))
+  (=> (and r1 (not r2))
+      (and g1 (not g2)))
+  (=> (and (not r1) r2)
+      (and (not g1) g2))
+  (=> (and r1 r2)
       ; the unconstrained value of `s` is used as non-deterministic choice
-      (ite s' (and g1' (not g2'))
-        (and (not g1') g2')))
+      (ite s (and g1 (not g2))
+        (and (not g1) g2)))
   )
 )
 
@@ -54,23 +56,21 @@
    (= a1 (and (not r1) (not r2)))
    ; a2 <=> no grants
    (= a2 (and (not g1) (not g2)))
-   ; b <=> 1 is 4
-   (= b (= c1 4))
+   ; b <=> 1 is 3
+   (= b (= c1 3))
  )
 )
 
 (check-system Monitor 
  :input ((r1 Bool) (r2 Bool)) 
  :output ((g1 Bool) (g2 Bool))
- :local ((a1 Bool) (a2 Bool) 
-         (b Bool)  (h1 Bool) 
-         (h2 Bool) (bf Bool) 
-         (c1 Int))
+ :local ((a1 Bool) (a2 Bool) (b Bool) (h1 Bool) (h2 Bool) 
+         (bf Bool) (c1 Int))
  ; no concurrent requests
  :assumption (A (not (and r1 r2))) 
  ; neg of: if there have been no requests, there have been no grants 
  :reachable (P1 (not (=> h1 h2))) 
- ; neg of: a request is granted at most 4 times
+ ; neg of: a request was granted at most 3 times
  :reachable (P2 (not (=> bf (not g1)))) 
  :query (Q1 (A P1))
  :query (Q2 (A P2))

@@ -2,24 +2,35 @@
 
 ; One-step delay
 (define-system Delay :input ( (i Int) ) :output ( (o Int) )
-  :local ( (s Int) )
-  :inv (= s i) 
-  :init (= o 0)
-  :trans (= o' s)
+ :local ( (s Int) )
+ :inv (= s i)     ; s always stores the current input
+ :init (= o 0)    ; output is 0 initially
+ :trans (= o' s)  ; new output is old state
 )
 
 ; Two-step delay
+;     +------------------------------------+
+;     |   DoubleDelay                      |
+;     |  +-----------+      +-----------+  |
+;  in |  |           | temp |           |  | out
+; ----+->|   Delay   |----->|   Delay   |--+---->
+;     |  |           |      |           |  |
+;     |  +-----------+      +-----------+  |
+;     +------------------------------------+
 (define-system DoubleDelay :input ( (in Int) ) :output ( (out Int) )
-  :local ( (temp Int) )
-  :subsys  (D1 (Delay in temp))
-  :subsys  (D2 (Delay temp out))
+ :local ( (temp Int) )
+ :subsys (D1 (Delay in temp))
+ :subsys (D2 (Delay temp out))
 )
 
 (check-system DoubleDelay
-  :input ( (in Int) ) 
-  :output ( (out Int) )
-  :local ( (temp Int) )
-  :reachable (r1 (= out 10))
-  :reachable (r2 (= out (- 10)))
-  :queries ( (q1 (r1)) (q2 (r2)) )
+ :input ( (in Int) )
+ :output ( (out Int) ) 
+ :local ( (temp Int) )
+ :assumption (a1 (< in in'))
+ :assumption (a2 (> in 0))
+ :reachable (r1 (= out 10))
+ :reachable (r2 (= out (- 10)))
+ :query (q1 (a1 r1))
+ :query (q2 (a2 r2))
 )

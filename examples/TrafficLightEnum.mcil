@@ -1,7 +1,7 @@
 (set-logic ALL)
 
 (declare-enum-sort LightStatus (red green yellow))
-(declare-enum-sort WalkStatus (yesWalk noWalk))
+(declare-enum-sort WalkStatus (stop go))
 
 (define-system CountToTen
     :input  ((switch Bool))
@@ -30,10 +30,9 @@
                     )
                  )
         )
-
         (= walk (ite (and (> phase 2) (< phase 10))
-                    yesWalk
-                    noWalk
+                    go
+                    stop
                 )
         )
     )
@@ -44,8 +43,8 @@
     :output ((light LightStatus) (walk WalkStatus))
     :local ((phase Int))
 
-    :reachable (r1 (and (= walk noWalk) (> phase 2)))
-    :reachable (r2 (and (= walk yesWalk) (= light green)))
+    :reachable (r1 (and (= walk stop) (> phase 2)))
+    :reachable (r2 (and (= walk go) (= light green)))
     :query (query1 (r1))
     :query (query2 (r2))
 )

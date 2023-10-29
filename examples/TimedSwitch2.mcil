@@ -16,7 +16,7 @@
        (and (= s' off) (= n' n)))            ; off --> off
    (=> (and (= s off) press')
        (and (= s' on) (= n' n)))             ; off --> on
-   (=> (and (= s on) (not press') (< 10 n))
+   (=> (and (= s on) (not press') (< n 10))
         (and (= s' on) (= n' (+ n 1))))      ; on --> on
    (=> (and (= s on) (or press' (>= n 10)))
        (and (= s' off) (= n' 0)))            ; on --> off
@@ -27,6 +27,12 @@
   :input ( (press Bool) )
   :output ( (sig Bool) )
   :local ( (s LightStatus) (n Int) )
-  :reachable (r1 (and press (= n 5)))
-  :query (p1 (r1))
+  :reachable (r1 (and press (not sig)))
+  :reachable (r2 (and sig sig'))
+  :reachable (r3 (= n 5))
+  :reachable (r4 (not (<= 0 n 10)))
+  :query (q1 (r1))
+  :query (q2 (r2))
+  :query (q3 (r3))
+  :query (q4 (r4))
 )

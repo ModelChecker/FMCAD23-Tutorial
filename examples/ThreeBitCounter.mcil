@@ -1,46 +1,151 @@
 (set-logic QF_LIA)
 
-(declare-const A Int)
-(declare-const B Int)
-(declare-const C Int)
-
+; Standard one-bit latch
 (define-system Latch  
-    :input ( (set Bool) (reset_count Bool) )  
-    :output ( (out Bool)) 
-    :local ( (s Bool) (b Bool) )
-    :init (= out b)
-    :trans (and
-        (= out' s)
-        (= s' (or (and set (or (not reset_count) b)) 
-                    (and (not set) (not reset_count) out)))
-    )
+ :input ( (set Bool) (reset_count Bool) )  
+ :output ( (out Bool)) 
+ :local ( (s Bool) (b Bool) )
+ :init (= out b)
+ :trans (and
+   (= out' s)
+   (= s' (or (and set (or (not reset_count) b)) 
+             (and (not set) (not reset_count) out)))
+ )
 )
 
+; One-bit counter
+;
+;        +--------------------------------------------------------------+
+;        |                                                              |
+;        |   +--------------------------------------------------------+ |
+;        |   |                                              +-------+ | |
+;        | +-|-----------------------------------|``-.  set |       | | |
+;        | | |                          |`-._    |    :---->|       | | |
+;        | | +--|``-.                +--|   _]o--|..-`      | Latch | | |
+;        | |    |    :--+----\``-.   |  |.-`          reset |       |-+----> out
+;   inc ---+----|..-`   |     )   :--+--------------------->|       |   |
+;        |              | +--/..-`                          +-------+   |
+;        |              | |                                             |
+; start ------------------+                OneBitCounter                |
+;        |              |                                               |
+;        +--------------|-----------------------------------------------+
+;                       |    
+;                       v carry
+;
 (define-system OneBitCounter :input ( (inc Bool) (start Bool) ) 
-    :output ( (out Bool) (carry Bool) )
-    :local ( (set Bool) (reset_count Bool) )
-    :subsys (L (Latch set reset_count out))
-    :inv (and 
+ :output ( (out Bool) (carry Bool) )
+ :local ( (set Bool) (reset_count Bool) )
+ :subsys (L (Latch set reset_count out))
+ :inv (and 
         (= set (and inc (not reset_count)))
         (= reset_count (or carry start))
         (= carry (and inc out))
     )
 )
 
+; Three-bit Counter
+;
+;          +---------------------------------------------------------+
+;          |                                                         |
+;          |           +------------------------------------------------> out0
+;          |           | out0           +-------------------------------> out1
+;          |           |                | out1           +--------------> out2
+;          |           |                |                |           |   
+;          |      +---------+      +---------+      +---------+      |    
+;  inc     |      |         | car0 |         | car1 |         | car2 |
+; ---------+----->| OneBit  |----->| OneBit  |----->| OneBit  |----->|
+;  start   +      | Counter |      | Counter |      | Counter |      |
+; ---------|--+-->|         |  +-->|         |  +-->|         |      |
+;          |  |   +---------+  |   +---------+  |   +---------+      |
+;          |  +----------------+----------------+                    |
+;          +---------------------------------------------------------+
+
 (define-system ThreeBitCounter  
-    :input ( (inc Bool) (start Bool) )
-    :output ( (out0 Bool) (out1 Bool) (out2 Bool) ) 
-    :local ( (car0 Bool) (car1 Bool) (car2 Bool) ) 
-    :subsys (C1 (OneBitCounter inc start out0 car0))
-    :subsys (C2 (OneBitCounter car0 start out1 car1)) 
-    :subsys (C3 (OneBitCounter car1 start out2 car2))
+ :input ( (inc Bool) (start Bool) )
+ :output ( (out0 Bool) (out1 Bool) (out2 Bool) ) 
+ :local ( (car0 Bool) (car1 Bool) (car2 Bool) ) 
+ :subsys (C1 (OneBitCounter inc start out0 car0))
+ :subsys (C2 (OneBitCounter car0 start out1 car1)) 
+ :subsys (C3 (OneBitCounter car1 start out2 car2))
 )
 
-; check system not part of the slides example
-(check-system ThreeBitCounter
-    :input ((inc Bool) (start Bool))
-    :output ((out0 Bool) (out1 Bool) (out2 Bool))
-    :local ((car0 Bool) (car1 Bool) (car2 Bool))
-    :reachable (r (and true (= out2 true)))
-    :query (query1 (r))
+
+; A delayed, resettable integer counter 
+; that ranges from 0 to 7. It's initial value is 0.
+(define-system DelayedCounter  
+ :input ( (inc Bool) (start Bool) )
+ :output ( (count Int) ) 
+ :local ( (next Int) ) 
+ :inv (= next (ite start 0 
+                (ite inc (ite (= count 7) 0 (+ count 1))
+                   count)))
+ :init (= count 0)
+ :trans (= count' next )
+)
+
+; convert three bits into the corresponding integer
+(define-system ToInt 
+ :input ( (b2 Bool) (b1 Bool) (b0 Bool) )
+ :output ( (n Int) )
+ :local ( (n2 Int) (n1 Int) (n0 Int) )
+ :inv (and
+   (= n0 (ite b0 1 0))
+   (= n1 (ite b1 1 0))
+   (= n2 (ite b2 1 0))
+   (= n (+ (* 4 n2) (* 2 n1) n0))
+ )
+)
+
+; (check-system ToInt
+;  :input ( (b2 Bool) (b1 Bool) (b0 Bool) )
+;  :output ( (n Int) )
+;  :local ( (n2 Int) (n1 Int) (n0 Int) )
+;  :reachable (r true)
+;  :query (q (r))
+; )
+
+; Once operator of past LTL
+(define-system Once 
+ :input  ( (x Bool) )
+ :output ( (y Bool) )
+ :init   (= y x)
+ :trans  (= y' (or x' y))
+)
+
+; (x since y) operator of past LTL
+(define-system Since 
+ :input  ( (x Bool) (y Bool) )
+ :output ( (z Bool) )
+ :init   (= z y)
+ :trans  (= z' (or y' (and x' z)))
+)
+
+(define-system CounterEq 
+ :input ( (inc Bool) (start Bool) )
+ :output ( (c1 Int) (c2 Int) )
+ :local ( (out0 Bool) (out1 Bool) (out2 Bool) 
+          (b1 Bool) (b2 Bool)(b3 Bool)
+ )
+ :inv (= b1 (= c1 c2))
+ :subsys (Co1 (ThreeBitCounter inc start out0 out1 out2))
+ :subsys (TI (ToInt out2 out1 out0 c1))
+ :subsys (Co2 (DelayedCounter inc start c2))
+ :subsys (S (Since b1 start b2))
+ :subsys (O (Once start b3))
+)
+
+(check-system CounterEq
+ :input ( (inc Bool) (start Bool) )
+ :output ( (c1 Int) (c2 Int) )
+ :local ( (out0 Bool) (out1 Bool) (out2 Bool)
+          (|c1 = c2| Bool)  
+          (|c1 = c2 since start| Bool)  
+          (|once start| Bool)
+ )
+ :reachable (r1 (not |c1 = c2|))
+ :reachable (r2 (not |c1 = c2 since start|))
+ :reachable (r3 (not (=> |once start| |c1 = c2 since start|)))
+;  :query (q1 (r1))
+;  :query (q2 (r2))
+ :query (q3 (r3))
 )

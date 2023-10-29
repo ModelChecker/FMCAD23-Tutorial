@@ -1,7 +1,21 @@
 (set-logic QF_LIA)
 
+(define-system Delay :input ( (i Int) ) :output ( (o Int) )
+  :local ( (s Int) )
+  :inv (= s i) 
+  :init (= o 0)
+  :trans (= o' s)
+)
+
+; Two-step delay
+(define-system DoubleDelay :input ( (in Int) ) :output ( (out Int) )
+  :local ( (temp Int) )
+  :subsys  (D1 (Delay in temp))
+  :subsys  (D2 (Delay temp out))
+)
+
 ;; DoubleDelay expanded
-(define-system DoubleDelay
+(define-system DoubleDelayExpanded
   :input ( (in Int) )
   :output ( (out Int) )
   :local ( 
@@ -23,16 +37,15 @@
   )
 )
 
+(define-system DoubleDelayEq :input ( (in Int) )
+  :local ( (out1 Int) (out2 Int) )
+  :subsys  (DD1 (DoubleDelay in out1))
+  :subsys  (DD2 (DoubleDelayExpanded in out2))
+)
 
-(check-system DoubleDelay
-  :input ( (in Int) )
-  :output ( (out Int) )
-  :local ( 
-    (temp Int)  
-    (s1 Int)      ; from `(Delay in temp)`
-    (s2 Int)      ; from `(Delay temp out)`
-  )
-  :reachable (r1 (= out 10))
-  :reachable (r2 (= out (- 10)))
-  :queries ( (q1 (r1)) (q2 (r2)) )
+(check-system DoubleDelayEq
+  :input ( (in Int) ) 
+  :local ( (out1 Int) (out2 Int) )
+  :reachable (r (not (= out1 out2))) 
+  :query (q1 (r))  ; Can DoubleDelay and DoubleDelayExpanded produced different outputs from the same input?
 )

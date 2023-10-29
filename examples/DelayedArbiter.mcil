@@ -1,24 +1,30 @@
 (set-logic QF_UF)
 
+; Arbiter grants requests from two sources in the next step
+;
 (define-system DelayedArbiter
  :input ( (r1 Bool) (r2 Bool) )
  :output ( (g1 Bool) (g2 Bool) )
- :init (and (not g1) (not g2) )  ; nothing is granted initially
+ :init (and (not g1) (not g2) )    ; nothing is granted initially
  :trans (and
     (=> (and (not r1) (not r2))
-        (and (not g1') (not g2')))
+        (and (not g1') (not g2'))) ; no requests, no grants
     (=> (and r1 (not r2))
-        (and g1' (not g2')))
+        (and g1' (not g2')))       ; request from r1 is granted when there is none from r2 
     (=> (and (not r1) r2)
-        (and (not g1') g2'))
+        (and (not g1') g2'))       ; request from r2 is granted when there is none from r1
     (=> (and r1 r2)
-        (not (= g1' g2')))
+        (not (= g1' g2')))         ; with concurrent requests, one is granted arbitrarily
   )
 )
 
 (check-system DelayedArbiter
  :input ( (r1 Bool) (r2 Bool) )
  :output ( (g1 Bool) (g2 Bool) )
- :reachable (r (and r1 r2 g2))
- :query (q (r))
+ :reachable (reach1 (and r1 g1'))
+ :reachable (reach2 (and r1 (not g1')))
+ :reachable (reach3 (and r1 (not r2) (not g1')))
+ :query (q1 (reach1)) ; Can a request be to be granted (in the next step)?
+ :query (q2 (reach2)) ; Can a request be to be denied?
+ :query (q3 (reach3)) ; Can a non-concurrent request be to be denied?
 )
